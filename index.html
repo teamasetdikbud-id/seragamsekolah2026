@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Bantuan Seragam - Kab. Donggala</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .hidden { display: none; }
+    .header-donggala { background-color: #0056b3; color: white; padding: 15px; text-align: center; }
+    .table-wrapper { max-height: 500px; overflow-y: auto; }
+    .rekap-card h4 { margin-bottom: 0; font-weight: bold; }
+    .rekap-card h6 { margin-bottom: 5px; font-size: 0.85rem; opacity: 0.9; }
+  </style>
+</head>
+<body class="bg-light">
+
+  <div class="header-donggala mb-4">
+    <h4>Sistem Pendataan Bantuan Seragam SD 2026</h4>
+    <h6>Dinas Pendidikan, Pemuda dan Olahraga Kab. Donggala</h6>
+  </div>
+
+  <div class="container pb-5">
+    <!-- SECTION LOGIN -->
+    <div id="login-section" class="row justify-content-center">
+      <div class="col-md-5">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title text-center mb-4">Masuk ke Sistem</h5>
+            <div class="mb-3">
+              <label>Pilih Akses:</label>
+              <select id="login-role" class="form-select" onchange="toggleLoginFields()">
+                <option value="sekolah">Sekolah (NPSN)</option>
+                <option value="dinas">Admin Dinas</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <input type="text" id="login-username" class="form-control" placeholder="Masukkan NPSN / Username">
+            </div>
+            <div class="mb-3 hidden" id="div-password">
+              <input type="password" id="login-password" class="form-control" placeholder="Password">
+            </div>
+            <button class="btn btn-primary w-100" id="btn-login" onclick="prosesLogin()">Login</button>
+            <div id="login-msg" class="text-danger mt-2 text-center"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION SEKOLAH -->
+    <div id="sekolah-section" class="hidden">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 id="sekolah-title" class="mb-0">Dashboard Sekolah</h4>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+      </div>
+      
+      <div class="mb-3">
+        <label class="fw-bold mb-1">Alamat Sekolah:</label>
+        <input type="text" id="input-alamat" class="form-control" placeholder="Ketikkan Alamat Lengkap Sekolah...">
+      </div>
+      
+      <div id="alert-status" class="alert alert-info mb-4"></div>
+
+      <!-- KARTU REKAP SEKOLAH -->
+      <div class="row mb-2 text-center" id="rekap-kartu-sekolah">
+        <div class="col-6 col-md-2 mb-3">
+          <div class="card bg-dark text-white shadow-sm rekap-card">
+            <div class="card-body p-2"><h6>Total Siswa</h6><h4 id="ks-total">0</h4></div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2 mb-3">
+          <div class="card bg-primary text-white shadow-sm rekap-card">
+            <div class="card-body p-2"><h6>Ukuran S</h6><h4 id="ks-s">0</h4></div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2 mb-3">
+          <div class="card bg-success text-white shadow-sm rekap-card">
+            <div class="card-body p-2"><h6>Ukuran M</h6><h4 id="ks-m">0</h4></div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2 mb-3">
+          <div class="card bg-info text-white shadow-sm rekap-card">
+            <div class="card-body p-2"><h6>Ukuran L</h6><h4 id="ks-l">0</h4></div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2 mb-3">
+          <div class="card bg-warning text-dark shadow-sm rekap-card">
+            <div class="card-body p-2"><h6>Ukuran XL</h6><h4 id="ks-xl">0</h4></div>
+          </div>
+        </div>
+        <div class="col-6 col-md-2 mb-3">
+          <div class="card bg-danger text-white shadow-sm rekap-card">
+            <div class="card-body p-2"><h6>Ukuran XXL</h6><h4 id="ks-xxl">0</h4></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h5 class="card-title">Daftar Siswa Penerima</h5>
+          <div class="table-responsive table-wrapper">
+            <table class="table table-bordered table-sm align-middle" id="table-siswa">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>No</th><th>Nama Siswa</th><th>NISN</th><th>Jenis Kelamin</th>
+                  <th>NIK</th><th style="min-width: 150px;">Nama Orang Tua</th>
+                  <th>Desil</th><th>Alamat</th><th style="min-width: 100px;">Ukuran Seragam</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button id="btn-simpan-ukuran" class="btn btn-success mt-3" onclick="simpanDataSemua()">Simpan Data</button>
+        </div>
+      </div>
+
+      <div class="card shadow-sm" id="card-dokumen">
+        <div class="card-body text-center">
+          <h5>Dokumen SK Penetapan</h5>
+          <p class="text-muted text-sm" id="teks-info-sk">Pastikan data diisi untuk mengunduh Draf SK.</p>
+          <button id="btn-download-sk" class="btn btn-outline-primary mb-3" disabled onclick="downloadSK()">Unduh Draf SK</button>
+          
+          <div class="mt-3 border-top pt-3">
+            <label><strong>Upload SK yang telah Ditandatangani & Cap (PDF/JPG)</strong></label>
+            <input type="file" id="file-sk" class="form-control mb-2" accept=".pdf,.jpg,.jpeg,.png">
+            <button id="btn-upload-sk" class="btn btn-primary w-100" onclick="uploadSK()" disabled>Kirim Data</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION DINAS -->
+    <div id="dinas-section" class="hidden">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Dashboard Rekapitulasi Dinas</h4>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+      </div>
+
+      <!-- TABS DINAS -->
+      <ul class="nav nav-tabs mb-4" id="dinasTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-dasbor">Dasbor & Rekap</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-verifikasi">Verifikasi Sekolah</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-datasiswa">Data Siswa</button></li>
+        <li class="nav-item"><button class="nav-link text-primary fw-bold" data-bs-toggle="tab" data-bs-target="#tab-unduh">Unduh Data (Excel)</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- TAB 1: DASBOR & REKAP -->
+        <div class="tab-pane fade show active" id="tab-dasbor">
+          <div class="row text-center mb-4">
+            <div class="col-md-4"><div class="card shadow-sm bg-primary text-white"><div class="card-body"><h5>Total Sekolah</h5><h2 id="tot-sekolah">0</h2></div></div></div>
+            <div class="col-md-4"><div class="card shadow-sm bg-success text-white"><div class="card-body"><h5>Total Siswa Bantuan</h5><h2 id="tot-siswa">0</h2></div></div></div>
+            <div class="col-md-4"><div class="card shadow-sm bg-info text-white"><div class="card-body"><h5>Sekolah Merespon</h5><h2 id="tot-selesai">0</h2></div></div></div>
+          </div>
+          
+          <div class="row mb-4">
+            <div class="col-md-8">
+              <div class="card shadow-sm h-100"><div class="card-body">
+                <h6 class="text-center">Progres Pengisian Per Kecamatan</h6>
+                <canvas id="chartBatang"></canvas>
+              </div></div>
+            </div>
+            <div class="col-md-4">
+              <div class="card shadow-sm h-100"><div class="card-body">
+                <h6 class="text-center">Kebutuhan Ukuran Seragam (Kabupaten)</h6>
+                <canvas id="chartDonat"></canvas>
+              </div></div>
+            </div>
+          </div>
+
+          <div class="card shadow-sm"><div class="card-body">
+            <h5 class="card-title">Rekapitulasi Per Kecamatan</h5>
+            <div class="table-responsive">
+              <table class="table table-bordered table-sm text-center" id="table-rekap-kec">
+                <thead class="table-primary"><tr><th>Kecamatan</th><th>Total Siswa</th><th>Sekolah Belum</th><th>Menunggu Verifikasi</th><th>Disetujui</th><th>Ditolak</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- TAB 2: VERIFIKASI SEKOLAH -->
+        <div class="tab-pane fade" id="tab-verifikasi">
+          <div class="card shadow-sm"><div class="card-body">
+            <input type="text" id="search-sekolah" class="form-control mb-3 w-50" placeholder="Cari Sekolah..." onkeyup="filterTabelVerifikasi()">
+            <div class="table-responsive table-wrapper">
+              <table class="table table-hover table-bordered align-middle" id="table-verifikasi">
+                <thead class="table-dark sticky-top">
+                  <tr><th>NPSN</th><th>Nama Sekolah</th><th>Kecamatan</th><th>Status</th><th>Dokumen SK</th><th>Aksi Verifikasi</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- TAB 3: DATA SISWA LENGKAP -->
+        <div class="tab-pane fade" id="tab-datasiswa">
+          <div class="card shadow-sm"><div class="card-body">
+            <input type="text" id="search-siswa" class="form-control mb-3 w-50" placeholder="Cari Nama Siswa atau Sekolah..." onkeyup="filterTabelSiswaDinas()">
+            <div class="table-responsive table-wrapper">
+              <table class="table table-bordered table-sm table-striped" id="table-semua-siswa">
+                <thead class="table-info sticky-top">
+                  <tr><th>NPSN</th><th>Nama Sekolah</th><th>Nama Siswa</th><th>Kelas</th><th>L/P</th><th>Ukuran</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- TAB 4: UNDUH DATA -->
+        <div class="tab-pane fade" id="tab-unduh">
+          <div class="row">
+            <!-- Download Kabupaten -->
+            <div class="col-md-4 mb-3">
+              <div class="card shadow-sm border-primary h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                  <h5 class="text-primary mb-3">Unduh Rekap Kabupaten</h5>
+                  <p class="text-muted small">Menampilkan rekapitulasi jumlah ukuran (S,M,L,XL,XXL) per Kecamatan di seluruh Kabupaten Donggala.</p>
+                  <button class="btn btn-primary mt-auto" onclick="unduhExcelKabupaten()">Unduh Excel</button>
+                </div>
+              </div>
+            </div>
+            <!-- Download Kecamatan -->
+            <div class="col-md-4 mb-3">
+              <div class="card shadow-sm border-success h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                  <h5 class="text-success mb-3">Unduh Rekap Kecamatan</h5>
+                  <p class="text-muted small">Menampilkan rekapitulasi ukuran per Sekolah pada kecamatan tertentu.</p>
+                  <select id="sel-unduh-kec" class="form-select mb-3"></select>
+                  <button class="btn btn-success mt-auto" onclick="unduhExcelKecamatan()">Unduh Excel</button>
+                </div>
+              </div>
+            </div>
+            <!-- Download Sekolah -->
+            <div class="col-md-4 mb-3">
+              <div class="card shadow-sm border-info h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                  <h5 class="text-info mb-3">Unduh Data Sekolah</h5>
+                  <p class="text-muted small">Menampilkan rincian lengkap setiap siswa (Nama, Kelas, Ukuran) beserta rekap total ukuran di sekolah tersebut.</p>
+                  <select id="sel-unduh-sek" class="form-select mb-3"></select>
+                  <button class="btn btn-info mt-auto text-white" onclick="unduhExcelSekolah()">Unduh Excel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // PASTE URL APPS SCRIPT ANDA DI BAWAH INI
+    // ==========================================
+    const APP_URL = "https://script.google.com/macros/s/AKfycbyCIupMbMoWjgjuyUcVBadyVwPzPD6rUhjVQitSXF--9y0L_mN1GDoFm1feRvwVk6O3mQ/exec"; 
+    
+    function callBackend(payload, callback) {
+      fetch(APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) })
+      .then(res => res.json()).then(data => callback(data))
+      .catch(err => { alert("Gagal terhubung ke server."); console.error(err); });
+    }
+
+    let activeNpsn = '';
+    let activeNamaSekolah = '';
+    let activeAlamatSekolah = '';
+    let statusSekolah = '';
+    let siswaData = [];
+    let isLocked = false;
+    let chartInstanceBatang = null;
+    let chartInstanceDonat = null;
+
+    // Data Global Dinas
+    let dataSekolahDinas = [];
+    let dataSiswaDinas = [];
+
+    function toggleLoginFields() {
+      let role = document.getElementById('login-role').value;
+      document.getElementById('div-password').classList.toggle('hidden', role === 'sekolah');
+    }
+
+    function prosesLogin() {
+      let role = document.getElementById('login-role').value;
+      let user = document.getElementById('login-username').value;
+      let pass = document.getElementById('login-password').value;
+      
+      document.getElementById('login-msg').innerText = "Memproses...";
+      document.getElementById('btn-login').disabled = true;
+
+      callBackend({ action: 'login', username: user, password: pass, role: role }, function(res) {
+        document.getElementById('btn-login').disabled = false;
+        document.getElementById('login-msg').innerText = "";
+        if (res.success) {
+          document.getElementById('login-section').classList.add('hidden');
+          if (res.role === 'sekolah') {
+            activeNpsn = res.npsn;
+            activeNamaSekolah = res.nama;
+            activeAlamatSekolah = res.alamat;
+            statusSekolah = res.status;
+            isLocked = (statusSekolah === 'Selesai' || statusSekolah === 'Disetujui');
+            loadSekolahDashboard();
+          } else {
+            loadDinasDashboard();
+          }
+        } else {
+          document.getElementById('login-msg').innerText = res.message;
+        }
+      });
+    }
+
+    // ==========================
+    // BAGIAN SEKOLAH
+    // ==========================
+    function loadSekolahDashboard() {
+      document.getElementById('sekolah-section').classList.remove('hidden');
+      document.getElementById('sekolah-title').innerText = activeNamaSekolah + " (" + activeNpsn + ")";
+      document.getElementById('input-alamat').value = activeAlamatSekolah;
+      document.getElementById('input-alamat').disabled = isLocked;
+      
+      let alertBox = document.getElementById('alert-status');
+      let dokBox = document.getElementById('card-dokumen');
+      let btnSimpan = document.getElementById('btn-simpan-ukuran');
+
+      if (statusSekolah === 'Disetujui') {
+        alertBox.innerText = "Selesai! Data Anda telah diverifikasi dan DISETUJUI oleh Dinas.";
+        alertBox.className = "alert alert-success";
+        btnSimpan.disabled = true; dokBox.classList.add('hidden');
+      } else if (statusSekolah === 'Selesai') {
+        alertBox.innerText = "Data telah terkirim. Menunggu proses verifikasi (Setujui/Tolak) dari Dinas.";
+        alertBox.className = "alert alert-info";
+        btnSimpan.disabled = true; dokBox.classList.add('hidden');
+      } else if (statusSekolah === 'Ditolak') {
+        alertBox.innerText = "Perhatian! Berkas SK Anda DITOLAK oleh Dinas. Silakan perbaiki data dan unggah kembali SK yang benar.";
+        alertBox.className = "alert alert-danger";
+        btnSimpan.disabled = false; dokBox.classList.remove('hidden');
+      } else {
+        alertBox.innerText = "Silakan lengkapi Alamat Sekolah, Nama Orang Tua, dan Ukuran Seragam.";
+        alertBox.className = "alert alert-warning";
+        btnSimpan.disabled = false; dokBox.classList.remove('hidden');
+      }
+
+      callBackend({ action: 'getSiswa', npsn: activeNpsn }, function(res) {
+        if(res.success) {
+          siswaData = res.siswa;
+          renderTabelSiswa();
+          if (res.semuaLengkap && activeAlamatSekolah.trim() !== '' && !isLocked) {
+            document.getElementById('btn-download-sk').disabled = false;
+            document.getElementById('teks-info-sk').innerHTML = "Data lengkap. Klik <b>Unduh Draf SK</b> lalu unggah SK final.";
+          } else {
+            document.getElementById('btn-download-sk').disabled = true;
+          }
+        }
+      });
+    }
+
+    function renderTabelSiswa() {
+      let tbody = document.querySelector('#table-siswa tbody');
+      tbody.innerHTML = '';
+      let ukuranArr = ['S', 'M', 'L', 'XL', 'XXL'];
+      
+      siswaData.forEach((s, idx) => {
+        let tr = document.createElement('tr');
+        let selectUkuran = `<select class="form-select form-select-sm sel-ukuran" data-row="${s.rowIdx}" onchange="hitungRekapSekolah()" ${isLocked?'disabled':''}>
+            <option value="">-Pilih-</option>` + ukuranArr.map(u => `<option value="${u}" ${s.ukuran===u?'selected':''}>${u}</option>`).join('') + `</select>`;
+        let inputOrtu = `<input type="text" class="form-control form-control-sm in-ortu" placeholder="Nama Ortu..." value="${s.ortu === '-' ? '' : s.ortu}" ${isLocked?'disabled':''}>`;
+
+        tr.innerHTML = `<td>${idx+1}</td><td>${s.nama}</td><td>${s.nisn}</td><td>${s.jk}</td>
+          <td>${s.nik}</td><td>${inputOrtu}</td><td>${s.desil}</td><td>${s.alamat}</td><td>${selectUkuran}</td>`;
+        tbody.appendChild(tr);
+      });
+      hitungRekapSekolah();
+    }
+
+    function hitungRekapSekolah() {
+      let total = 0, s = 0, m = 0, l = 0, xl = 0, xxl = 0;
+      let selects = document.querySelectorAll('.sel-ukuran');
+      total = selects.length;
+      
+      selects.forEach(sel => {
+        let val = sel.value;
+        if (val === 'S') s++;
+        else if (val === 'M') m++;
+        else if (val === 'L') l++;
+        else if (val === 'XL') xl++;
+        else if (val === 'XXL') xxl++;
+      });
+      
+      document.getElementById('ks-total').innerText = total;
+      document.getElementById('ks-s').innerText = s;
+      document.getElementById('ks-m').innerText = m;
+      document.getElementById('ks-l').innerText = l;
+      document.getElementById('ks-xl').innerText = xl;
+      document.getElementById('ks-xxl').innerText = xxl;
+    }
+
+    function simpanDataSemua() {
+      let alamatBaru = document.getElementById('input-alamat').value.trim();
+      if(alamatBaru === '') return alert("Mohon isi Alamat Sekolah!");
+      
+      document.getElementById('btn-simpan-ukuran').innerText = "Menyimpan...";
+      let dataToSave = [];
+      document.querySelectorAll('#table-siswa tbody tr').forEach(tr => {
+        dataToSave.push({ rowIdx: tr.querySelector('.sel-ukuran').dataset.row, ukuran: tr.querySelector('.sel-ukuran').value, ortu: tr.querySelector('.in-ortu').value.trim() });
+      });
+      
+      callBackend({ action: 'simpanData', npsn: activeNpsn, alamat: alamatBaru, dataSiswa: dataToSave }, function(res) {
+        document.getElementById('btn-simpan-ukuran').innerText = "Simpan Data";
+        alert("Perubahan Data Berhasil Disimpan!");
+        activeAlamatSekolah = alamatBaru;
+        loadSekolahDashboard(); 
+      });
+    }
+
+    function downloadSK() {
+      let barisSiswa = '';
+      siswaData.forEach((s, idx) => {
+        barisSiswa += `
+          <tr>
+            <td class="text-center">${idx + 1}</td>
+            <td>${s.nama}</td>
+            <td class="text-center">${s.nisn}</td>
+            <td class="text-center">${s.kelas}</td>
+            <td>${s.ortu}</td>
+            <td class="text-center">${s.ukuran}</td>
+          </tr>
+        `;
+      });
+
+      let skHTML = `
+        <html>
+        <head>
+          <title>Draf SK - ${activeNamaSekolah}</title>
+          <style>
+            body { font-family: "Times New Roman", Times, serif; margin: 40px; font-size: 12pt; line-height: 1.5; }
+            .text-center { text-align: center; }
+            .text-left { text-align: left; }
+            .text-justify { text-align: justify; }
+            .bold { font-weight: bold; }
+            .header { border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 20px; }
+            .header h3, .header h2 { margin: 2px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            table, th, td { border: 1px solid black; }
+            th, td { padding: 5px; }
+            .no-border { border: none; }
+            .no-border td { border: none; padding: 2px; vertical-align: top; }
+            .signature { margin-top: 50px; float: right; width: 300px; text-align: center; }
+            .page-break { page-break-before: always; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <table class="no-border" style="width: 100%; margin-top: 0; margin-bottom: 0;">
+              <tr>
+                <td style="width: 15%; text-align: center; vertical-align: middle;">
+                  <img src="https://i.ibb.co.com/5xhN0cm1/Logo-Donggala.png" style="width: 90px; height: auto;" alt="Logo Donggala">
+                </td>
+                <td style="width: 70%; text-align: center; vertical-align: middle;">
+                  <h3 style="margin: 0;">PEMERINTAH KABUPATEN DONGGALA</h3>
+                  <h3 style="margin: 0;">DINAS PENDIDIKAN, PEMUDA DAN OLAHRAGA</h3>
+                  <h2 style="margin: 5px 0;">${activeNamaSekolah}</h2>
+                  <p style="margin: 0;">Alamat: ${activeAlamatSekolah}</p>
+                </td>
+                <td style="width: 15%;"></td>
+              </tr>
+            </table>
+          </div>
+          
+          <div class="text-center bold">
+            <p style="text-decoration: underline; margin-bottom: 0;">KEPUTUSAN KEPALA SEKOLAH</p>
+            <p style="margin-top: 0;">NOMOR: ................................................</p>
+            <p>TENTANG<br>PENETAPAN SISWA CALON PENERIMA BANTUAN SERAGAM SEKOLAH GRATIS<br>TAHUN ANGGARAN 2026</p>
+          </div>
+          
+          <p class="text-center bold" style="margin-top:20px;">KEPALA ${activeNamaSekolah},</p>
+          
+          <table class="no-border">
+            <tr>
+              <td style="width: 15%;">Menimbang</td>
+              <td style="width: 2%;">:</td>
+              <td class="text-justify">
+                <ol style="margin: 0; padding-left: 20px;" type="a">
+                  <li>bahwa dalam rangka mendukung akses pendidikan dan meringankan beban orang tua/wali peserta didik, Pemerintah Kabupaten Donggala melalui Dinas Pendidikan, Pemuda dan Olaharaga menyelenggarakan program bantuan seragam sekolah gratis;</li>
+                  <li>bahwa agar penetapan calon penerima bantuan dilaksanakan secara tertib, objektif, transparan, dan dapat dipertanggungjawabkan, perlu dilakukan pendataan dan verifikasi calon penerima;</li>
+                  <li>bahwa berdasarkan hasil pendataan dan verifikasi, perlu menetapkan siswa calon penerima bantuan seragam sekolah gratis melalui Keputusan Kepala Sekolah.</li>
+                </ol>
+              </td>
+            </tr>
+            <tr>
+              <td>Mengingat</td>
+              <td>:</td>
+              <td class="text-justify">
+                <ol style="margin: 0; padding-left: 20px;" type="1">
+                  <li>Undang-Undang Nomor 20 Tahun 2003 tentang Sistem Pendidikan Nasional;</li>
+                  <li>Peraturan Pemerintah (PP) Nomor 17 Tahun 2010 tentang Pengelolaan dan Penyelenggaraan Pendidikan, sebagaimana telah diubah dengan PP Nomor 66 Tahun 2010;</li>
+                  <li>Peraturan Bupati Donggala Nomor 2 Tahun 2025 Tentang Bantuan Seragam Bagi Peserta Didik Sekolah Dasar dan Sekolah Menengah Pertama;</li>
+                  <li>Surat Pelaksana Tugas Kepala Dinas Pendidikan dan Kebudayaan Kabupaten Donggala Nomor:400.3.6.5/4/DISDIKBUD-KAB.DONGGALA/I/2026, tanggal 21 Januari 2026 tentang Permintaan Data Siswa Calon Penerima Seragam tahun 2026.</li>
+                </ol>
+              </td>
+            </tr>
+            <tr>
+              <td>Memperhatikan</td>
+              <td>:</td>
+              <td class="text-justify">Hasil pendataan dan verifikasi calon penerima bantuan seragam sekolah gratis di ${activeNamaSekolah} Tahun Anggaran 2026.</td>
+            </tr>
+          </table>
+
+          <div class="text-center bold" style="margin-top: 20px;">MEMUTUSKAN:</div>
+          
+          <table class="no-border">
+            <tr>
+              <td style="width: 15%;">Menetapkan</td>
+              <td style="width: 2%;">:</td>
+              <td class="text-justify bold">KEPUTUSAN KEPALA SEKOLAH TENTANG PENETAPAN SISWA CALON PENERIMA BANTUAN SERAGAM SEKOLAH GRATIS TAHUN ANGGARAN 2026</td>
+            </tr>
+            <tr>
+              <td>KESATU</td>
+              <td>:</td>
+              <td class="text-justify">Menetapkan nama-nama siswa sebagaimana tercantum dalam Lampiran yang merupakan bagian tidak terpisahkan dari Keputusan ini sebagai calon penerima bantuan seragam sekolah gratis di ${activeNamaSekolah} Tahun Anggaran 2026.</td>
+            </tr>
+            <tr>
+              <td>KEDUA</td>
+              <td>:</td>
+              <td class="text-justify">Daftar calon penerima disusun berdasarkan data yang tersedia dan hasil verifikasi sekolah, serta dapat disesuaikan dengan hasil verifikasi akhir, kuota, kriteria, dan ketentuan program yang berlaku.</td>
+            </tr>
+            <tr>
+              <td>KETIGA</td>
+              <td>:</td>
+              <td class="text-justify">Calon penerima dan orang tua/wali wajib menyampaikan data yang benar. Apabila ditemukan ketidaksesuaian data atau calon penerima tidak memenuhi kriteria, daftar dapat diperbaiki atau nama yang bersangkutan dibatalkan sesuai ketentuan.</td>
+            </tr>
+            <tr>
+              <td>KEEMPAT</td>
+              <td>:</td>
+              <td class="text-justify">Pelaksanaan penyaluran bantuan dilakukan sesuai mekanisme, jadwal, kuota, dan petunjuk teknis yang ditetapkan oleh Dinas Pendidikan, Pemuda dan Olahraga Kabupaten Donggala.</td>
+            </tr>
+            <tr>
+              <td>KELIMA</td>
+              <td>:</td>
+              <td class="text-justify">Keputusan ini mulai berlaku pada tanggal ditetapkan. Apabila di kemudian hari terdapat kekeliruan, akan dilakukan perbaikan sebagaimana mestinya.</td>
+            </tr>
+          </table>
+
+          <div class="signature">
+            <p class="text-left" style="margin-bottom: 0;">Ditetapkan di &nbsp;: .............................</p>
+            <p class="text-left" style="margin-top: 0; border-bottom: 1px solid black; padding-bottom: 5px;">Pada tanggal &nbsp;&nbsp;: .............................</p>
+            <p class="bold">KEPALA SEKOLAH,</p>
+            <br><br><br><br>
+            <p class="bold" style="text-decoration: underline; margin-bottom: 0;">(....................................................)</p>
+            <p style="margin-top: 0;">NIP. ........................................</p>
+          </div>
+          
+          <div style="clear: both;"></div>
+          <div class="page-break"></div>
+
+          <!-- HALAMAN LAMPIRAN -->
+          <div style="float: left;">
+            <table class="no-border" style="width: auto;">
+              <tr><td>LAMPIRAN</td><td>:</td><td>KEPUTUSAN KEPALA ${activeNamaSekolah}</td></tr>
+              <tr><td>NOMOR</td><td>:</td><td>................................................</td></tr>
+              <tr><td style="vertical-align: top;">TENTANG</td><td style="vertical-align: top;">:</td><td>PENETAPAN SISWA CALON PENERIMA BANTUAN SERAGAM SEKOLAH GRATIS TAHUN ANGGARAN 2026</td></tr>
+            </table>
+          </div>
+          <div style="clear: both; margin-bottom: 20px;"></div>
+
+          <table>
+            <thead>
+              <tr style="background-color: #f2f2f2;">
+                <th style="width: 5%;">No.</th>
+                <th>Nama Siswa</th>
+                <th>NISN/NIS</th>
+                <th>Kelas</th>
+                <th>Nama Orang Tua/Wali</th>
+                <th>Ukuran Seragam</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${barisSiswa}
+            </tbody>
+          </table>
+
+          <div class="signature">
+            <p class="bold">KEPALA SEKOLAH,</p>
+            <br><br><br><br>
+            <p class="bold" style="text-decoration: underline; margin-bottom: 0;">(....................................................)</p>
+            <p style="margin-top: 0;">NIP. ........................................</p>
+          </div>
+
+          <div style="clear: both;"></div>
+          <p style="margin-top: 50px; font-style: italic; font-size: 10pt;">Catatan: Lengkapi identitas sekolah, nomor dan tanggal keputusan. Sesuaikan lampiran dengan hasil verifikasi dan ketentuan resmi program sebelum ditandatangani.</p>
+        </body>
+        </html>
+      `;
+
+      let printWin = window.open('', '_blank');
+      printWin.document.write(skHTML); printWin.document.close();
+      setTimeout(() => { printWin.print(); document.getElementById('btn-upload-sk').disabled = false; alert("Silakan simpan PDF dan aktifkan fitur Upload Data."); }, 500);
+    }
+
+    function uploadSK() {
+      let file = document.getElementById('file-sk').files[0];
+      if (!file) return alert("Pilih file!");
+      document.getElementById('btn-upload-sk').innerText = "Mengunggah...";
+      document.getElementById('btn-upload-sk').disabled = true;
+      let reader = new FileReader();
+      reader.onload = function(e) {
+        callBackend({ action: 'uploadSK', npsn: activeNpsn, base64Data: e.target.result, filename: file.name }, function(res) {
+          if(res.success){ alert("Terkirim! Menunggu validasi Dinas."); statusSekolah = 'Selesai'; isLocked = true; loadSekolahDashboard(); }
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ==========================
+    // BAGIAN DINAS
+    // ==========================
+    function loadDinasDashboard() {
+      document.getElementById('dinas-section').classList.remove('hidden');
+      callBackend({ action: 'getDashboardDinas' }, function(res) {
+        if(res.success){
+          dataSekolahDinas = res.sekolah;
+          dataSiswaDinas = res.siswa;
+
+          document.getElementById('tot-sekolah').innerText = res.rekapKab.sekolah;
+          document.getElementById('tot-siswa').innerText = res.rekapKab.siswa;
+          document.getElementById('tot-selesai').innerText = res.rekapKab.selesai;
+
+          renderCharts(res.grafikBatang, res.grafikDonat);
+          renderTabelRekapKecamatan(res.grafikBatang);
+          renderTabelVerifikasi(dataSekolahDinas);
+          renderTabelSemuaSiswa(dataSiswaDinas);
+          populateSelectUnduhan();
+        }
+      });
+    }
+
+    function populateSelectUnduhan() {
+      let kecSet = new Set();
+      dataSekolahDinas.forEach(d => { if(d.kecamatan) kecSet.add(d.kecamatan); });
+      let kecHtml = '<option value="">- Pilih Kecamatan -</option>';
+      Array.from(kecSet).sort().forEach(k => kecHtml += `<option value="${k}">${k}</option>`);
+      document.getElementById('sel-unduh-kec').innerHTML = kecHtml;
+
+      let sekHtml = '<option value="">- Pilih Sekolah -</option>';
+      dataSekolahDinas.sort((a,b)=> a.nama.localeCompare(b.nama)).forEach(s => {
+          sekHtml += `<option value="${s.npsn}">${s.npsn} - ${s.nama}</option>`;
+      });
+      document.getElementById('sel-unduh-sek').innerHTML = sekHtml;
+    }
+
+    function exportTableToExcel(htmlString, filename) {
+        let uri = 'data:application/vnd.ms-excel;base64,';
+        let template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body>{table}</body></html>';
+        let base64 = function(s) { return window.btoa(unescape(encodeURIComponent(s))) };
+        let format = function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }) };
+        let ctx = { worksheet: 'Sheet1', table: htmlString };
+        let a = document.createElement('a');
+        a.href = uri + base64(format(template, ctx));
+        a.download = filename;
+        a.click();
+    }
+
+    function unduhExcelKabupaten() {
+      let kecData = {};
+      dataSiswaDinas.forEach(s => {
+        let k = s.kecamatan || "LAINNYA";
+        let uk = s.ukuran || "-";
+        if (!kecData[k]) kecData[k] = { S:0, M:0, L:0, XL:0, XXL:0, Total:0 };
+        if (kecData[k][uk] !== undefined) { kecData[k][uk]++; kecData[k].Total++; }
+      });
+
+      let grandTotal = { S:0, M:0, L:0, XL:0, XXL:0, Total:0 };
+      let rows = ''; let no = 1;
+      for (let k in kecData) {
+        let d = kecData[k];
+        rows += `<tr><td>${no++}</td><td>${k}</td><td>${d.S}</td><td>${d.M}</td><td>${d.L}</td><td>${d.XL}</td><td>${d.XXL}</td><td><b>${d.Total}</b></td></tr>`;
+        grandTotal.S += d.S; grandTotal.M += d.M; grandTotal.L += d.L; grandTotal.XL += d.XL; grandTotal.XXL += d.XXL; grandTotal.Total += d.Total;
+      }
+      rows += `<tr><td colspan="2"><b>TOTAL KABUPATEN</b></td><td><b>${grandTotal.S}</b></td><td><b>${grandTotal.M}</b></td><td><b>${grandTotal.L}</b></td><td><b>${grandTotal.XL}</b></td><td><b>${grandTotal.XXL}</b></td><td><b>${grandTotal.Total}</b></td></tr>`;
+
+      let tableHTML = `<table border="1"><tr><th colspan="8" style="font-size: 16px;">REKAPITULASI JUMLAH SERAGAM - KABUPATEN DONGGALA</th></tr>
+        <tr style="background-color:#d9ead3;"><th>No</th><th>Kecamatan</th><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>Total</th></tr>${rows}</table>`;
+      
+      exportTableToExcel(tableHTML, "Rekap_Seragam_Kabupaten_Donggala.xls");
+    }
+
+    function unduhExcelKecamatan() {
+      let kec = document.getElementById('sel-unduh-kec').value;
+      if (!kec) return alert("Pilih Kecamatan terlebih dahulu!");
+
+      let sekData = {};
+      dataSiswaDinas.forEach(s => {
+        if (s.kecamatan === kec) {
+          if (!sekData[s.sekolah]) sekData[s.sekolah] = { npsn: s.npsn, S:0, M:0, L:0, XL:0, XXL:0, Total:0 };
+          let uk = s.ukuran || "-";
+          if (sekData[s.sekolah][uk] !== undefined) { sekData[s.sekolah][uk]++; sekData[s.sekolah].Total++; }
+        }
+      });
+
+      let grandTotal = { S:0, M:0, L:0, XL:0, XXL:0, Total:0 };
+      let rows = ''; let no = 1;
+      for (let namaSek in sekData) {
+        let d = sekData[namaSek];
+        rows += `<tr><td>${no++}</td><td>${d.npsn}</td><td>${namaSek}</td><td>${d.S}</td><td>${d.M}</td><td>${d.L}</td><td>${d.XL}</td><td>${d.XXL}</td><td><b>${d.Total}</b></td></tr>`;
+        grandTotal.S += d.S; grandTotal.M += d.M; grandTotal.L += d.L; grandTotal.XL += d.XL; grandTotal.XXL += d.XXL; grandTotal.Total += d.Total;
+      }
+      rows += `<tr><td colspan="3"><b>TOTAL KECAMATAN ${kec.toUpperCase()}</b></td><td><b>${grandTotal.S}</b></td><td><b>${grandTotal.M}</b></td><td><b>${grandTotal.L}</b></td><td><b>${grandTotal.XL}</b></td><td><b>${grandTotal.XXL}</b></td><td><b>${grandTotal.Total}</b></td></tr>`;
+
+      let tableHTML = `<table border="1"><tr><th colspan="9" style="font-size: 16px;">REKAPITULASI SERAGAM - KEC. ${kec.toUpperCase()}</th></tr>
+        <tr style="background-color:#c9daf8;"><th>No</th><th>NPSN</th><th>Nama Sekolah</th><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>Total</th></tr>${rows}</table>`;
+      
+      exportTableToExcel(tableHTML, `Rekap_Seragam_Kecamatan_${kec}.xls`);
+    }
+
+    function unduhExcelSekolah() {
+      let npsn = document.getElementById('sel-unduh-sek').value;
+      if (!npsn) return alert("Pilih Sekolah terlebih dahulu!");
+
+      let sekName = ''; let kecName = '';
+      let rows = ''; let no = 1;
+      let rekap = { S:0, M:0, L:0, XL:0, XXL:0, Total:0 };
+
+      dataSiswaDinas.forEach(s => {
+        if (s.npsn.toString() === npsn.toString()) {
+          sekName = s.sekolah; kecName = s.kecamatan;
+          rows += `<tr><td>${no++}</td><td>${s.nama}</td><td>${sekName}</td><td>${kecName}</td><td>Donggala</td><td>${s.kelas}</td><td>${s.jk}</td><td style="text-align:center;"><b>${s.ukuran}</b></td></tr>`;
+          
+          let uk = s.ukuran || "-";
+          if (rekap[uk] !== undefined) { rekap[uk]++; rekap.Total++; }
+        }
+      });
+
+      let tableHTML = `
+        <table border="1">
+          <tr><th colspan="8" style="font-size: 16px;">DATA PENERIMA SERAGAM - ${sekName.toUpperCase()}</th></tr>
+          <tr style="background-color:#fff2cc;"><th>No</th><th>Nama Siswa</th><th>Nama Sekolah</th><th>Kecamatan</th><th>Kabupaten</th><th>Kelas</th><th>L/P</th><th>Ukuran Seragam</th></tr>
+          ${rows}
+        </table>
+        <br>
+        <table border="1">
+          <tr><th colspan="2" style="background-color:#f4cccc;">REKAP JUMLAH UKURAN</th></tr>
+          <tr><td>Ukuran S</td><td>${rekap.S}</td></tr>
+          <tr><td>Ukuran M</td><td>${rekap.M}</td></tr>
+          <tr><td>Ukuran L</td><td>${rekap.L}</td></tr>
+          <tr><td>Ukuran XL</td><td>${rekap.XL}</td></tr>
+          <tr><td>Ukuran XXL</td><td>${rekap.XXL}</td></tr>
+          <tr><td><b>TOTAL KESELURUHAN</b></td><td><b>${rekap.Total}</b></td></tr>
+        </table>
+      `;
+      exportTableToExcel(tableHTML, `Data_Siswa_${sekName.replace(/\s+/g, '_')}.xls`);
+    }
+
+    function aksiVerifikasi(npsnLokal, statusVerifikasi) {
+      if(!confirm("Anda yakin mengubah status NPSN " + npsnLokal + " menjadi " + statusVerifikasi + "?")) return;
+      callBackend({ action: 'validasiSK', npsn: npsnLokal, status: statusVerifikasi }, function(res){
+        if(res.success){ alert("Status berhasil diubah!"); loadDinasDashboard(); }
+      });
+    }
+
+    function renderTabelVerifikasi(data) {
+      let tbody = document.querySelector('#table-verifikasi tbody'); tbody.innerHTML = '';
+      data.forEach(d => {
+        let badge = d.status === 'Selesai' ? '<span class="badge bg-info">Menunggu Validasi</span>' : 
+                    d.status === 'Disetujui' ? '<span class="badge bg-success">Disetujui</span>' : 
+                    d.status === 'Ditolak' ? '<span class="badge bg-danger">Ditolak</span>' : '<span class="badge bg-secondary">Belum</span>';
+        
+        let linkSK = d.url ? `<a href="${d.url}" target="_blank" class="btn btn-sm btn-outline-primary">Lihat SK</a>` : '-';
+        let aksi = '-';
+        if (d.status === 'Selesai') {
+          aksi = `<button class="btn btn-sm btn-success me-1" onclick="aksiVerifikasi('${d.npsn}', 'Disetujui')">Setujui</button>
+                  <button class="btn btn-sm btn-danger" onclick="aksiVerifikasi('${d.npsn}', 'Ditolak')">Tolak</button>`;
+        } else if (d.status === 'Disetujui' || d.status === 'Ditolak') {
+          aksi = `<button class="btn btn-sm btn-warning" onclick="aksiVerifikasi('${d.npsn}', 'Selesai')">Batal</button>`;
+        }
+        tbody.innerHTML += `<tr><td>${d.npsn}</td><td>${d.nama}</td><td>${d.kecamatan}</td><td>${badge}</td><td>${linkSK}</td><td>${aksi}</td></tr>`;
+      });
+    }
+
+    function renderTabelRekapKecamatan(dataKec) {
+      let tbody = document.querySelector('#table-rekap-kec tbody'); tbody.innerHTML = '';
+      for (let k in dataKec) {
+        let d = dataKec[k];
+        tbody.innerHTML += `<tr><td>${k}</td><td>${d.totalSiswa}</td><td>${d.belum}</td><td>${d.selesai}</td><td class="text-success fw-bold">${d.disetujui}</td><td class="text-danger fw-bold">${d.ditolak}</td></tr>`;
+      }
+    }
+
+    function renderTabelSemuaSiswa(dataSis) {
+      let tbody = document.querySelector('#table-semua-siswa tbody'); tbody.innerHTML = '';
+      dataSis.forEach(s => {
+        tbody.innerHTML += `<tr><td>${s.npsn}</td><td>${s.sekolah}</td><td>${s.nama}</td><td>${s.kelas}</td><td>${s.jk}</td><td>${s.ukuran}</td></tr>`;
+      });
+    }
+
+    function filterTabelVerifikasi() {
+      let val = document.getElementById('search-sekolah').value.toLowerCase();
+      let filtered = dataSekolahDinas.filter(d => d.npsn.toString().toLowerCase().includes(val) || d.nama.toLowerCase().includes(val));
+      renderTabelVerifikasi(filtered);
+    }
+
+    function filterTabelSiswaDinas() {
+      let val = document.getElementById('search-siswa').value.toLowerCase();
+      let filtered = dataSiswaDinas.filter(s => s.sekolah.toLowerCase().includes(val) || s.nama.toLowerCase().includes(val));
+      renderTabelSemuaSiswa(filtered);
+    }
+
+    function renderCharts(batangData, donatData) {
+      let labelKec = Object.keys(batangData);
+      let dataSelesai = labelKec.map(k => batangData[k].selesai + batangData[k].disetujui);
+      let dataBelum = labelKec.map(k => batangData[k].belum + batangData[k].ditolak);
+
+      if(chartInstanceBatang) chartInstanceBatang.destroy();
+      chartInstanceBatang = new Chart(document.getElementById('chartBatang'), {
+        type: 'bar', data: { labels: labelKec, datasets: [ { label: 'Sudah Upload', backgroundColor: '#0d6efd', data: dataSelesai }, { label: 'Belum Selesai', backgroundColor: '#c0c0c0', data: dataBelum } ] },
+        options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } } }
+      });
+
+      let labelUk = Object.keys(donatData); let dataUk = Object.values(donatData);
+      if(chartInstanceDonat) chartInstanceDonat.destroy();
+      chartInstanceDonat = new Chart(document.getElementById('chartDonat'), {
+        type: 'doughnut', data: { labels: labelUk, datasets: [{ data: dataUk, backgroundColor: ['#ffcd56','#ff6384','#36a2eb','#4bc0c0','#9966ff'] }] }
+      });
+    }
+
+    function logout() { location.reload(); }
+  </script>
+</body>
+</html>
