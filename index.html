@@ -118,13 +118,14 @@
       <div class="card shadow-sm" id="card-dokumen">
         <div class="card-body text-center">
           <h5>Dokumen SK Penetapan</h5>
-          <p class="text-muted text-sm" id="teks-info-sk">Pastikan data diisi untuk mengunduh Draf SK.</p>
-          <button id="btn-download-sk" class="btn btn-outline-primary mb-3" disabled onclick="downloadSK()">Unduh Draf SK</button>
+          <p class="text-muted text-sm" id="teks-info-sk">Anda harus mengisi <b>semua data</b> sebelum dapat mengunduh Draf SK atau mengirim file SK final.</p>
+          <!-- Tombol dibuat selalu aktif secara visual -->
+          <button id="btn-download-sk" class="btn btn-outline-primary mb-3" onclick="downloadSK()">Unduh Draf SK</button>
           
           <div class="mt-3 border-top pt-3">
             <label><strong>Upload SK yang telah Ditandatangani & Cap (PDF/JPG)</strong></label>
             <input type="file" id="file-sk" class="form-control mb-2" accept=".pdf,.jpg,.jpeg,.png">
-            <button id="btn-upload-sk" class="btn btn-primary w-100" onclick="uploadSK()" disabled>Kirim Data</button>
+            <button id="btn-upload-sk" class="btn btn-primary w-100" onclick="uploadSK()">Kirim Data</button>
           </div>
         </div>
       </div>
@@ -137,7 +138,6 @@
         <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
       </div>
 
-      <!-- TABS DINAS -->
       <ul class="nav nav-tabs mb-4" id="dinasTabs" role="tablist">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-dasbor">Dasbor & Rekap</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-verifikasi">Verifikasi Sekolah</button></li>
@@ -267,6 +267,9 @@
     let activeNpsn = ''; let activeNamaSekolah = ''; let activeAlamatSekolah = ''; let statusSekolah = '';
     let siswaData = []; let isLocked = false; let chartInstanceBatang = null; let chartInstanceDonat = null;
     let dataSekolahDinas = []; let dataSiswaDinas = [];
+    
+    // Variabel untuk melacak apakah Draf SK sudah pernah diunduh sesi ini
+    let isDraftDownloaded = false; 
 
     function toggleLoginFields() {
       let role = document.getElementById('login-role').value;
@@ -309,6 +312,7 @@
       document.getElementById('input-alamat').disabled = isLocked;
       
       let alertBox = document.getElementById('alert-status'); let dokBox = document.getElementById('card-dokumen'); let btnSimpan = document.getElementById('btn-simpan-ukuran');
+      let btnDownload = document.getElementById('btn-download-sk'); let btnUpload = document.getElementById('btn-upload-sk');
 
       if (statusSekolah === 'Disetujui') {
         alertBox.innerText = "Selesai! Data Anda telah diverifikasi dan DISETUJUI oleh Dinas."; alertBox.className = "alert alert-success";
@@ -319,21 +323,17 @@
       } else if (statusSekolah === 'Ditolak') {
         alertBox.innerText = "Perhatian! Berkas SK Anda DITOLAK oleh Dinas. Silakan perbaiki data dan unggah kembali SK yang benar."; alertBox.className = "alert alert-danger";
         btnSimpan.disabled = false; dokBox.classList.remove('hidden');
+        btnDownload.disabled = false; btnUpload.disabled = false;
       } else {
         alertBox.innerText = "Silakan lengkapi Alamat Sekolah, Nama Orang Tua, dan Ukuran Seragam."; alertBox.className = "alert alert-warning";
         btnSimpan.disabled = false; dokBox.classList.remove('hidden');
+        btnDownload.disabled = false; btnUpload.disabled = false;
       }
 
       callBackend({ action: 'getSiswa', npsn: activeNpsn }, function(res) {
         if(res.success) {
           siswaData = res.siswa;
           renderTabelSiswa();
-          if (res.semuaLengkap && activeAlamatSekolah.trim() !== '' && !isLocked) {
-            document.getElementById('btn-download-sk').disabled = false;
-            document.getElementById('teks-info-sk').innerHTML = "Data lengkap. Klik <b>Unduh Draf SK</b> lalu unggah SK final.";
-          } else {
-            document.getElementById('btn-download-sk').disabled = true;
-          }
         }
       });
     }
@@ -368,6 +368,20 @@
       document.getElementById('ks-xl').innerText = xl; document.getElementById('ks-xxl').innerText = xxl;
     }
 
+    // Fungsi Validasi Lokal (Cek apakah ada yang masih kosong)
+    function periksaKelengkapanLokal() {
+      let belumLengkap = false;
+      document.querySelectorAll('#table-siswa tbody tr').forEach(tr => {
+        let uk = tr.querySelector('.sel-ukuran').value;
+        let ortu = tr.querySelector('.in-ortu').value.trim();
+        if(uk === '' || ortu === '') belumLengkap = true;
+      });
+      let alamat = document.getElementById('input-alamat').value.trim();
+      
+      if (alamat === '' || belumLengkap) return false;
+      return true;
+    }
+
     function simpanDataSemua() {
       let alamatBaru = document.getElementById('input-alamat').value.trim();
       if(alamatBaru === '') return alert("Mohon isi Alamat Sekolah!");
@@ -383,12 +397,32 @@
     }
 
     function downloadSK() {
+      // 1. Cek kelengkapan data sebelum mengizinkan download Draf SK
+      if (!periksaKelengkapanLokal()) {
+        alert("PERHATIAN: Tidak dapat mengunduh Draf SK!\n\nMasih ada data (Alamat Sekolah, Nama Orang Tua, atau Ukuran Seragam) yang belum diisi. Harap lengkapi semua data dan klik tombol 'Simpan Data' terlebih dahulu.");
+        return;
+      }
+
       let barisSiswa = '';
-      siswaData.forEach((s, idx) => {
-        barisSiswa += `<tr><td class="text-center">${idx + 1}</td><td>${s.nama}</td><td class="text-center">${s.nisn}</td><td class="text-center">${s.kelas}</td><td>${s.ortu}</td><td class="text-center">${s.ukuran}</td></tr>`;
+      // Membaca data yang ada di tabel saat ini (bukan hanya yang tersimpan di siswaData awal)
+      document.querySelectorAll('#table-siswa tbody tr').forEach(tr => {
+        let cells = tr.querySelectorAll('td');
+        let no = cells[0].innerText;
+        let namaSiswa = cells[1].innerText;
+        let nisn = cells[2].innerText;
+        let jk = cells[3].innerText; // jk is at index 3
+        let kelas = siswaData[no-1].kelas; // get from array because it's not rendered in table
+        let ortu = tr.querySelector('.in-ortu').value.trim();
+        let ukuran = tr.querySelector('.sel-ukuran').value;
+
+        barisSiswa += `<tr><td class="text-center">${no}</td><td>${namaSiswa}</td><td class="text-center">${nisn}</td><td class="text-center">${kelas}</td><td>${ortu}</td><td class="text-center">${ukuran}</td></tr>`;
       });
+      
+      // Update alamat sekolah jika baru diedit tapi blm simpan
+      let currentAlamat = document.getElementById('input-alamat').value.trim();
+
       let skHTML = `<html><head><title>Draf SK - ${activeNamaSekolah}</title><style> body { font-family: "Times New Roman", Times, serif; margin: 40px; font-size: 12pt; line-height: 1.5; } .text-center { text-align: center; } .text-left { text-align: left; } .text-justify { text-align: justify; } .bold { font-weight: bold; } table { width: 100%; border-collapse: collapse; margin-top: 10px; } table, th, td { border: 1px solid black; } th, td { padding: 5px; } .no-border { border: none; } .no-border td { border: none; padding: 2px; vertical-align: top; } .signature { margin-top: 50px; float: right; width: 300px; text-align: center; } .page-break { page-break-before: always; } .header { border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 20px; } .header h3, .header h2 { margin: 2px 0; } </style></head><body>
-          <div class="header"><table class="no-border" style="width: 100%; margin-top: 0; margin-bottom: 0;"><tr><td style="width: 15%; text-align: center; vertical-align: middle;"><img src="https://i.ibb.co.com/5xhN0cm1/Logo-Donggala.png" style="width: 90px; height: auto;"></td><td style="width: 70%; text-align: center; vertical-align: middle;"><h3 style="margin: 0;">PEMERINTAH KABUPATEN DONGGALA</h3><h3 style="margin: 0;">DINAS PENDIDIKAN, PEMUDA DAN OLAHRAGA</h3><h2 style="margin: 5px 0;">${activeNamaSekolah}</h2><p style="margin: 0;">Alamat: ${activeAlamatSekolah}</p></td><td style="width: 15%;"></td></tr></table></div>
+          <div class="header"><table class="no-border" style="width: 100%; margin-top: 0; margin-bottom: 0;"><tr><td style="width: 15%; text-align: center; vertical-align: middle;"><img src="https://i.ibb.co.com/5xhN0cm1/Logo-Donggala.png" style="width: 90px; height: auto;"></td><td style="width: 70%; text-align: center; vertical-align: middle;"><h3 style="margin: 0;">PEMERINTAH KABUPATEN DONGGALA</h3><h3 style="margin: 0;">DINAS PENDIDIKAN, PEMUDA DAN OLAHRAGA</h3><h2 style="margin: 5px 0;">${activeNamaSekolah}</h2><p style="margin: 0;">Alamat: ${currentAlamat}</p></td><td style="width: 15%;"></td></tr></table></div>
           <div class="text-center bold"><p style="text-decoration: underline; margin-bottom: 0;">KEPUTUSAN KEPALA SEKOLAH</p><p style="margin-top: 0;">NOMOR: ................................................</p><p>TENTANG<br>PENETAPAN SISWA CALON PENERIMA BANTUAN SERAGAM SEKOLAH GRATIS<br>TAHUN ANGGARAN 2026</p></div>
           <p class="text-center bold" style="margin-top:20px;">KEPALA ${activeNamaSekolah},</p>
           <table class="no-border"><tr><td style="width: 15%;">Menimbang</td><td style="width: 2%;">:</td><td class="text-justify"><ol style="margin: 0; padding-left: 20px;" type="a"><li>bahwa dalam rangka mendukung akses pendidikan dan meringankan beban orang tua/wali peserta didik, Pemerintah Kabupaten Donggala melalui Dinas Pendidikan, Pemuda dan Olaharaga menyelenggarakan program bantuan seragam sekolah gratis;</li><li>bahwa agar penetapan calon penerima bantuan dilaksanakan secara tertib, objektif, transparan, dan dapat dipertanggungjawabkan, perlu dilakukan pendataan dan verifikasi calon penerima;</li><li>bahwa berdasarkan hasil pendataan dan verifikasi, perlu menetapkan siswa calon penerima bantuan seragam sekolah gratis melalui Keputusan Kepala Sekolah.</li></ol></td></tr><tr><td>Mengingat</td><td>:</td><td class="text-justify"><ol style="margin: 0; padding-left: 20px;" type="1"><li>Undang-Undang Nomor 20 Tahun 2003 tentang Sistem Pendidikan Nasional;</li><li>Peraturan Pemerintah (PP) Nomor 17 Tahun 2010 tentang Pengelolaan dan Penyelenggaraan Pendidikan, sebagaimana telah diubah dengan PP Nomor 66 Tahun 2010;</li><li>Peraturan Bupati Donggala Nomor 2 Tahun 2025 Tentang Bantuan Seragam Bagi Peserta Didik Sekolah Dasar dan Sekolah Menengah Pertama;</li><li>Surat Pelaksana Tugas Kepala Dinas Pendidikan dan Kebudayaan Kabupaten Donggala Nomor:400.3.6.5/4/DISDIKBUD-KAB.DONGGALA/I/2026, tanggal 21 Januari 2026 tentang Permintaan Data Siswa Calon Penerima Seragam tahun 2026.</li></ol></td></tr><tr><td>Memperhatikan</td><td>:</td><td class="text-justify">Hasil pendataan dan verifikasi calon penerima bantuan seragam sekolah gratis di ${activeNamaSekolah} Tahun Anggaran 2026.</td></tr></table>
@@ -402,17 +436,45 @@
 
       let printWin = window.open('', '_blank');
       printWin.document.write(skHTML); printWin.document.close();
-      setTimeout(() => { printWin.print(); document.getElementById('btn-upload-sk').disabled = false; alert("Silakan simpan PDF dan aktifkan fitur Upload Data."); }, 500);
+      
+      // Menandai bahwa Draf SK sudah pernah diunduh
+      isDraftDownloaded = true;
+
+      setTimeout(() => { printWin.print(); alert("Silakan simpan PDF SK tersebut."); }, 500);
     }
 
     function uploadSK() {
+      // 1. Cek Kelengkapan Data
+      if (!periksaKelengkapanLokal()) {
+        alert("GAGAL MENGIRIM!\n\nMasih ada data (Alamat Sekolah, Nama Orang Tua, atau Ukuran Seragam) yang belum diisi. Harap lengkapi semua data dan klik tombol 'Simpan Data' terlebih dahulu.");
+        return;
+      }
+
+      // 2. Cek apakah Draf SK sudah diunduh
+      if (!isDraftDownloaded) {
+        alert("GAGAL MENGIRIM!\n\nAnda harus mengunduh Draf SK terlebih dahulu dengan mengklik tombol 'Unduh Draf SK'.");
+        return;
+      }
+
       let file = document.getElementById('file-sk').files[0];
-      if (!file) return alert("Pilih file!");
-      document.getElementById('btn-upload-sk').innerText = "Mengunggah..."; document.getElementById('btn-upload-sk').disabled = true;
+      if (!file) return alert("Pilih file PDF/JPG SK yang sudah ditandatangani terlebih dahulu!");
+
+      document.getElementById('btn-upload-sk').innerText = "Mengunggah..."; 
+      document.getElementById('btn-upload-sk').disabled = true;
+
       let reader = new FileReader();
       reader.onload = function(e) {
         callBackend({ action: 'uploadSK', npsn: activeNpsn, base64Data: e.target.result, filename: file.name }, function(res) {
-          if(res.success){ alert("Terkirim! Menunggu validasi Dinas."); statusSekolah = 'Selesai'; isLocked = true; loadSekolahDashboard(); }
+          if(res.success){ 
+            alert("Terkirim! Data dikunci dan menunggu validasi Dinas."); 
+            statusSekolah = 'Selesai'; 
+            isLocked = true; 
+            loadSekolahDashboard(); 
+          } else {
+            alert("Terjadi kesalahan saat mengunggah. Silakan coba lagi.");
+            document.getElementById('btn-upload-sk').innerText = "Kirim Data"; 
+            document.getElementById('btn-upload-sk').disabled = false;
+          }
         });
       };
       reader.readAsDataURL(file);
@@ -538,23 +600,13 @@
         let a = document.createElement('a'); a.href = uri + base64(format(template, ctx)); a.download = filename; a.click();
     }
 
-    // =====================================
-    // FUNGSI UNDUH (DIPERBARUI DG GENDER L/P)
-    // =====================================
-
     function unduhExcelKabupaten() {
       let kecData = {};
       dataSiswaDinas.forEach(s => {
-        let k = s.kecamatan || "LAINNYA";
-        let uk = s.ukuran || "-";
+        let k = s.kecamatan || "LAINNYA"; let uk = s.ukuran || "-";
         let jk = s.jk === 'L' ? 'L' : (s.jk === 'P' ? 'P' : '-');
-        
-        if (!kecData[k]) {
-          kecData[k] = { L: { S:0, M:0, L:0, XL:0, XXL:0, Total:0 }, P: { S:0, M:0, L:0, XL:0, XXL:0, Total:0 } };
-        }
-        if (jk === 'L' || jk === 'P') {
-            if (kecData[k][jk][uk] !== undefined) { kecData[k][jk][uk]++; kecData[k][jk].Total++; }
-        }
+        if (!kecData[k]) { kecData[k] = { L: { S:0, M:0, L:0, XL:0, XXL:0, Total:0 }, P: { S:0, M:0, L:0, XL:0, XXL:0, Total:0 } }; }
+        if (jk === 'L' || jk === 'P') { if (kecData[k][jk][uk] !== undefined) { kecData[k][jk][uk]++; kecData[k][jk].Total++; } }
       });
 
       let gt = { L: { S:0, M:0, L:0, XL:0, XXL:0, Total:0 }, P: { S:0, M:0, L:0, XL:0, XXL:0, Total:0 } };
@@ -570,7 +622,6 @@
           <td>${d.P.S}</td><td>${d.P.M}</td><td>${d.P.L}</td><td>${d.P.XL}</td><td>${d.P.XXL}</td><td><b>${d.P.Total}</b></td>
           <td style="background-color:#fff2cc;"><b>${tS}</b></td><td style="background-color:#fff2cc;"><b>${tM}</b></td><td style="background-color:#fff2cc;"><b>${tL}</b></td><td style="background-color:#fff2cc;"><b>${tXL}</b></td><td style="background-color:#fff2cc;"><b>${tXXL}</b></td><td style="background-color:#ffe599;"><b>${tTotal}</b></td>
         </tr>`;
-        
         ['S','M','L','XL','XXL','Total'].forEach(u => { gt.L[u] += d.L[u]; gt.P[u] += d.P[u]; });
       }
       
@@ -583,24 +634,13 @@
         <td style="background-color:#ea9999;"><b>${gtS}</b></td><td style="background-color:#ea9999;"><b>${gtM}</b></td><td style="background-color:#ea9999;"><b>${gtL}</b></td><td style="background-color:#ea9999;"><b>${gtXL}</b></td><td style="background-color:#ea9999;"><b>${gtXXL}</b></td><td style="background-color:#e06666; color:white;"><b>${gtTotal}</b></td>
       </tr>`;
 
-      let tableHTML = `<table border="1">
-        <tr><th colspan="20" style="font-size: 16px;">REKAPITULASI JUMLAH SERAGAM BERDASARKAN JENIS KELAMIN - KABUPATEN DONGGALA</th></tr>
-        <tr style="background-color:#d9ead3;">
-            <th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">Kecamatan</th>
-            <th colspan="6">Laki-Laki (L)</th><th colspan="6">Perempuan (P)</th><th colspan="6" style="background-color:#ffe599;">Total Keseluruhan</th>
-        </tr>
-        <tr style="background-color:#d9ead3;">
-            <th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>JML</th>
-            <th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>JML</th>
-            <th style="background-color:#fff2cc;">S</th><th style="background-color:#fff2cc;">M</th><th style="background-color:#fff2cc;">L</th><th style="background-color:#fff2cc;">XL</th><th style="background-color:#fff2cc;">XXL</th><th style="background-color:#ffe599;">TOTAL</th>
-        </tr>${rows}</table>`;
+      let tableHTML = `<table border="1"><tr><th colspan="20" style="font-size: 16px;">REKAPITULASI JUMLAH SERAGAM BERDASARKAN JENIS KELAMIN - KABUPATEN DONGGALA</th></tr><tr style="background-color:#d9ead3;"><th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">Kecamatan</th><th colspan="6">Laki-Laki (L)</th><th colspan="6">Perempuan (P)</th><th colspan="6" style="background-color:#ffe599;">Total Keseluruhan</th></tr><tr style="background-color:#d9ead3;"><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>JML</th><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>JML</th><th style="background-color:#fff2cc;">S</th><th style="background-color:#fff2cc;">M</th><th style="background-color:#fff2cc;">L</th><th style="background-color:#fff2cc;">XL</th><th style="background-color:#fff2cc;">XXL</th><th style="background-color:#ffe599;">TOTAL</th></tr>${rows}</table>`;
       exportTableToExcel(tableHTML, "Rekap_Seragam_Kabupaten_Donggala.xls");
     }
 
     function unduhExcelKecamatan() {
       let kec = document.getElementById('sel-unduh-kec').value;
       if (!kec) return alert("Pilih Kecamatan terlebih dahulu!");
-
       let sekData = {};
       dataSiswaDinas.forEach(s => {
         if (s.kecamatan === kec) {
@@ -635,24 +675,13 @@
         <td style="background-color:#ea9999;"><b>${gtS}</b></td><td style="background-color:#ea9999;"><b>${gtM}</b></td><td style="background-color:#ea9999;"><b>${gtL}</b></td><td style="background-color:#ea9999;"><b>${gtXL}</b></td><td style="background-color:#ea9999;"><b>${gtXXL}</b></td><td style="background-color:#e06666; color:white;"><b>${gtTotal}</b></td>
       </tr>`;
 
-      let tableHTML = `<table border="1">
-        <tr><th colspan="21" style="font-size: 16px;">REKAPITULASI SERAGAM BERDASARKAN JENIS KELAMIN - KEC. ${kec.toUpperCase()}</th></tr>
-        <tr style="background-color:#c9daf8;">
-            <th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">NPSN</th><th rowspan="2" style="vertical-align:middle;">Nama Sekolah</th>
-            <th colspan="6">Laki-Laki (L)</th><th colspan="6">Perempuan (P)</th><th colspan="6" style="background-color:#ffe599;">Total Keseluruhan</th>
-        </tr>
-        <tr style="background-color:#c9daf8;">
-            <th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>JML</th>
-            <th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>JML</th>
-            <th style="background-color:#fff2cc;">S</th><th style="background-color:#fff2cc;">M</th><th style="background-color:#fff2cc;">L</th><th style="background-color:#fff2cc;">XL</th><th style="background-color:#fff2cc;">XXL</th><th style="background-color:#ffe599;">TOTAL</th>
-        </tr>${rows}</table>`;
+      let tableHTML = `<table border="1"><tr><th colspan="21" style="font-size: 16px;">REKAPITULASI SERAGAM BERDASARKAN JENIS KELAMIN - KEC. ${kec.toUpperCase()}</th></tr><tr style="background-color:#c9daf8;"><th rowspan="2" style="vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">NPSN</th><th rowspan="2" style="vertical-align:middle;">Nama Sekolah</th><th colspan="6">Laki-Laki (L)</th><th colspan="6">Perempuan (P)</th><th colspan="6" style="background-color:#ffe599;">Total Keseluruhan</th></tr><tr style="background-color:#c9daf8;"><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>JML</th><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>JML</th><th style="background-color:#fff2cc;">S</th><th style="background-color:#fff2cc;">M</th><th style="background-color:#fff2cc;">L</th><th style="background-color:#fff2cc;">XL</th><th style="background-color:#fff2cc;">XXL</th><th style="background-color:#ffe599;">TOTAL</th></tr>${rows}</table>`;
       exportTableToExcel(tableHTML, `Rekap_Seragam_Kecamatan_${kec}.xls`);
     }
 
     function unduhExcelSekolah() {
       let npsn = document.getElementById('sel-unduh-sek').value;
       if (!npsn) return alert("Pilih Sekolah terlebih dahulu!");
-
       let sekName = ''; let kecName = ''; let rows = ''; let no = 1;
       let rekap = { L: { S:0, M:0, L:0, XL:0, XXL:0, Total:0 }, P: { S:0, M:0, L:0, XL:0, XXL:0, Total:0 } };
 
@@ -660,7 +689,6 @@
         if (s.npsn.toString() === npsn.toString()) {
           sekName = s.sekolah; kecName = s.kecamatan;
           rows += `<tr><td>${no++}</td><td>${s.nama}</td><td>${sekName}</td><td>${kecName}</td><td>Donggala</td><td>${s.kelas}</td><td style="text-align:center;">${s.jk}</td><td style="text-align:center;"><b>${s.ukuran}</b></td></tr>`;
-          
           let uk = s.ukuran || "-"; let jk = s.jk === 'L' ? 'L' : (s.jk === 'P' ? 'P' : '-');
           if ((jk === 'L' || jk === 'P') && rekap[jk][uk] !== undefined) { rekap[jk][uk]++; rekap[jk].Total++; }
         }
@@ -668,24 +696,7 @@
 
       let tS = rekap.L.S + rekap.P.S; let tM = rekap.L.M + rekap.P.M; let tL = rekap.L.L + rekap.P.L; let tXL = rekap.L.XL + rekap.P.XL; let tXXL = rekap.L.XXL + rekap.P.XXL; let tTotal = rekap.L.Total + rekap.P.Total;
 
-      let tableHTML = `
-        <table border="1">
-          <tr><th colspan="8" style="font-size: 16px;">DATA PENERIMA SERAGAM - ${sekName.toUpperCase()}</th></tr>
-          <tr style="background-color:#fff2cc;"><th>No</th><th>Nama Siswa</th><th>Nama Sekolah</th><th>Kecamatan</th><th>Kabupaten</th><th>Kelas</th><th>L/P</th><th>Ukuran Seragam</th></tr>
-          ${rows}
-        </table>
-        <br>
-        <table border="1">
-          <tr><th colspan="4" style="background-color:#fce5cd; font-size: 14px;">REKAP JUMLAH UKURAN BERDASARKAN JENIS KELAMIN</th></tr>
-          <tr style="background-color:#d9ead3;"><th>Ukuran</th><th>Laki-Laki (L)</th><th>Perempuan (P)</th><th>Total Keseluruhan</th></tr>
-          <tr><td><b>Ukuran S</b></td><td style="text-align:center;">${rekap.L.S}</td><td style="text-align:center;">${rekap.P.S}</td><td style="text-align:center;"><b>${tS}</b></td></tr>
-          <tr><td><b>Ukuran M</b></td><td style="text-align:center;">${rekap.L.M}</td><td style="text-align:center;">${rekap.P.M}</td><td style="text-align:center;"><b>${tM}</b></td></tr>
-          <tr><td><b>Ukuran L</b></td><td style="text-align:center;">${rekap.L.L}</td><td style="text-align:center;">${rekap.P.L}</td><td style="text-align:center;"><b>${tL}</b></td></tr>
-          <tr><td><b>Ukuran XL</b></td><td style="text-align:center;">${rekap.L.XL}</td><td style="text-align:center;">${rekap.P.XL}</td><td style="text-align:center;"><b>${tXL}</b></td></tr>
-          <tr><td><b>Ukuran XXL</b></td><td style="text-align:center;">${rekap.L.XXL}</td><td style="text-align:center;">${rekap.P.XXL}</td><td style="text-align:center;"><b>${tXXL}</b></td></tr>
-          <tr style="background-color:#f4cccc;"><td><b>TOTAL KESELURUHAN</b></td><td style="text-align:center;"><b>${rekap.L.Total}</b></td><td style="text-align:center;"><b>${rekap.P.Total}</b></td><td style="text-align:center; font-size:14px;"><b>${tTotal}</b></td></tr>
-        </table>
-      `;
+      let tableHTML = `<table border="1"><tr><th colspan="8" style="font-size: 16px;">DATA PENERIMA SERAGAM - ${sekName.toUpperCase()}</th></tr><tr style="background-color:#fff2cc;"><th>No</th><th>Nama Siswa</th><th>Nama Sekolah</th><th>Kecamatan</th><th>Kabupaten</th><th>Kelas</th><th>L/P</th><th>Ukuran Seragam</th></tr>${rows}</table><br><table border="1"><tr><th colspan="4" style="background-color:#fce5cd; font-size: 14px;">REKAP JUMLAH UKURAN BERDASARKAN JENIS KELAMIN</th></tr><tr style="background-color:#d9ead3;"><th>Ukuran</th><th>Laki-Laki (L)</th><th>Perempuan (P)</th><th>Total Keseluruhan</th></tr><tr><td><b>Ukuran S</b></td><td style="text-align:center;">${rekap.L.S}</td><td style="text-align:center;">${rekap.P.S}</td><td style="text-align:center;"><b>${tS}</b></td></tr><tr><td><b>Ukuran M</b></td><td style="text-align:center;">${rekap.L.M}</td><td style="text-align:center;">${rekap.P.M}</td><td style="text-align:center;"><b>${tM}</b></td></tr><tr><td><b>Ukuran L</b></td><td style="text-align:center;">${rekap.L.L}</td><td style="text-align:center;">${rekap.P.L}</td><td style="text-align:center;"><b>${tL}</b></td></tr><tr><td><b>Ukuran XL</b></td><td style="text-align:center;">${rekap.L.XL}</td><td style="text-align:center;">${rekap.P.XL}</td><td style="text-align:center;"><b>${tXL}</b></td></tr><tr><td><b>Ukuran XXL</b></td><td style="text-align:center;">${rekap.L.XXL}</td><td style="text-align:center;">${rekap.P.XXL}</td><td style="text-align:center;"><b>${tXXL}</b></td></tr><tr style="background-color:#f4cccc;"><td><b>TOTAL KESELURUHAN</b></td><td style="text-align:center;"><b>${rekap.L.Total}</b></td><td style="text-align:center;"><b>${rekap.P.Total}</b></td><td style="text-align:center; font-size:14px;"><b>${tTotal}</b></td></tr></table>`;
       exportTableToExcel(tableHTML, `Data_Siswa_${sekName.replace(/\s+/g, '_')}.xls`);
     }
 
